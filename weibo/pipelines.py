@@ -13,7 +13,7 @@ from weibo.models import Base, User
 
 class WeiboPipeline(object):
     def __init__(self):
-        engine = create_engine('sqlite:///test.db')
+        engine = create_engine('mysql+pymysql://root:123456@localhost:3306/weibo?charset=utf8mb4')
         Base.metadata.create_all(engine)
         SessionCls = sessionmaker(bind=engine)
         self.session = SessionCls()

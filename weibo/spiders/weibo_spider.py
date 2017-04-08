@@ -10,7 +10,7 @@ from weibo.items import WeiboItem
 class WeiboSpider(Spider):
     name = 'weibo'
 
-    cookie = input('请输入cookie')
+    cookie = input('请输入cookie:\n')
 
     headers = {
         "Accept": "application/json, text/plain, */*",
@@ -31,7 +31,7 @@ class WeiboSpider(Spider):
         self.uid = uid
 
     def start_requests(self):
-        logging.debug('start_request')
+        logging.info('start_request')
 
         yield Request(
             url='{0}?containerid=100505{1}_-_FOLLOWERS'.format(self.getSecond, self.uid),
@@ -57,7 +57,8 @@ class WeiboSpider(Spider):
             )
         item = WeiboItem()
         # 从response.url中截取uid
-        item['uid'] = response.url.split('_')[0].split('=')[1][6:]
+        uid = response.url.split('_')[0].split('=')[1][6:]
+        item['uid'] = uid
 
         # 遍历cards
         cards = jsonObj.get('cards') or []
@@ -85,6 +86,13 @@ class WeiboSpider(Spider):
 
         yield item
 
+        # 获取此人粉丝信息
+        yield Request(
+            url='{0}?containerid=100505{1}_-_FOLLOWERS'.format(self.getSecond, uid),
+            headers=self.headers,
+            callback=self.parse_followers
+        )
+
     def parse_followers(self, response):
         """
         解析关注者信息
@@ -101,11 +109,14 @@ class WeiboSpider(Spider):
             for card in cards:
                 uid = card.get('user').get('id')
                 logging.info(card.get('user').get('screen_name'))
+
+                # 获取此人详细信息
                 yield Request(
                     url='{0}?containerid=230283{1}_-_INFO'.format(self.getIndex, uid),
                     headers=self.headers,
                     callback=self.parse_person
                 )
+
         # 没有粉丝
         except:
             msg = jsonObj['msg']
