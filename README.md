@@ -1,7 +1,10 @@
-# 一个微博粉丝爬虫
+# 一个微博用户爬虫
+## 功能
+跟随微博关注链，爬取大量用户信息。
+
 ## 运行
 ```bash
-scrapy crawl weibo -a uid=<想爬取的uid>
+python run.py
 ```
 
 ## 有待改进

@@ -5,7 +5,25 @@ from scrapy import Request
 from scrapy import Spider
 
 from weibo.items import WeiboItem
+from weibo import session
+from weibo.models import Uid
 
+def add_new_uncrawled_uid(uid):
+    uncrawled_uid = Uid(uid)
+    session.add(uncrawled_uid)
+    try:
+        session.commit()
+    except:
+        session.rollback()
+
+def change_to_crawled_uid(uid):
+    try:
+        crawled_uid = session.query(Uid).filter_by(uid=uid).first()
+        crawled_uid.is_fans_crawled = True
+        session.add(crawled_uid)
+        session.commit()
+    except:
+        logging.info('没有uid={uid}的uncrawled_uid'.format(uid=uid))
 
 class WeiboSpider(Spider):
     name = 'weibo'
@@ -27,17 +45,30 @@ class WeiboSpider(Spider):
     getSecond = 'http://m.weibo.cn/container/getSecond'
     getIndex = 'http://m.weibo.cn/container/getIndex'
 
-    def __init__(self, uid):
-        self.uid = uid
+    def __init__(self):
+        self.start_uid = '1669282904'   # 谷大白话
+        self.uncrawled_uids = session.query(Uid.uid).filter_by(is_fans_crawled=False).all()
 
     def start_requests(self):
         logging.info('start_request')
 
-        yield Request(
-            url='{0}?containerid=100505{1}_-_FOLLOWERS'.format(self.getSecond, self.uid),
-            headers=self.headers,
-            callback=self.parse_followers
-        )
+        # 没有记录时，初始化爬取
+        if len(self.uncrawled_uids) == 0:
+            add_new_uncrawled_uid(self.start_uid)
+            yield Request(
+                url='{0}?containerid=100505{1}_-_FOLLOWERS'.format(self.getSecond, self.start_uid),
+                headers=self.headers,
+                callback=self.parse_followers
+            )
+        else:
+            for uid in self.uncrawled_uids:
+                add_new_uncrawled_uid(uid)
+                yield Request(
+                    url='{0}?containerid=100505{1}_-_FOLLOWERS'.format(self.getSecond, uid),
+                    headers=self.headers,
+                    callback=self.parse_followers
+                )
+
 
     def parse_person(self, response):
         """
@@ -99,16 +130,23 @@ class WeiboSpider(Spider):
         :param response:
         :return:
         """
-        logging.debug('parse_followers')
-
+        current_uid =response.url.split('_')[0].split('=')[1][6:]
+        logging.info('current_uid:{uid} parse_followers'.format(uid=current_uid))
+        add_new_uncrawled_uid(current_uid)
         jsonObj = json.loads(response.text)
 
         # 解析cards中朋友信息
         try:
             cards = jsonObj.get('cards')
             for card in cards:
+                # 发现一个uid
                 uid = card.get('user').get('id')
                 logging.info(card.get('user').get('screen_name'))
+
+                # 将其加入uids表
+                uncrawled_uid = Uid(uid)
+                session.add(uncrawled_uid)
+                session.commit()
 
                 # 获取此人详细信息
                 yield Request(
@@ -120,17 +158,19 @@ class WeiboSpider(Spider):
         # 没有粉丝
         except:
             msg = jsonObj['msg']
-            print(msg)
+            logging.info(msg)
+            change_to_crawled_uid(current_uid)
             return
 
         # 解析下一页中的朋友信息
         try:
             next_page = jsonObj['cardlistInfo']['page']
             yield Request(
-                url='{0}?containerid=100505{1}_-_FOLLOWERS&page={2}'.format(self.getSecond, self.uid, next_page),
+                url='{0}?containerid=100505{1}_-_FOLLOWERS&page={2}'.format(self.getSecond, current_uid, next_page),
                 headers=self.headers,
                 callback=self.parse_followers
             )
         except:
-            print('没有了')
+            logging.info('{uid}的粉丝信息解析完毕。'.format(uid=current_uid))
+            change_to_crawled_uid(current_uid)
             return

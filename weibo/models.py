@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String,Boolean
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -29,3 +29,16 @@ class User(Base):
 
     def __repr__(self):
         return 'User: %r' % self.name
+
+class Uid(Base):
+    __tablename__ = 'uids'
+    id = Column(Integer, primary_key=True)
+    uid = Column(String(255))
+    is_fans_crawled = Column(Boolean)
+
+    def __init__(self,uid):
+        self.uid = uid
+        self.is_fans_crawled = False
+
+    def __repr__(self):
+        return '<Uid: {0} crawled = {1}>'.format(self.uid,self.is_fans_crawled)

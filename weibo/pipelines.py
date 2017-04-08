@@ -4,19 +4,14 @@
 #
 # Don't forget to add your pipeline to the ITEM_PIPELINES setting
 # See: http://doc.scrapy.org/en/latest/topics/item-pipeline.html
+import logging
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from weibo.models import Base, User
-
+from weibo import session
+from weibo.models import User
 
 class WeiboPipeline(object):
     def __init__(self):
-        engine = create_engine('mysql+pymysql://root:123456@localhost:3306/weibo?charset=utf8mb4')
-        Base.metadata.create_all(engine)
-        SessionCls = sessionmaker(bind=engine)
-        self.session = SessionCls()
+        pass
 
     def process_item(self, item, spider):
         user = User(
@@ -29,7 +24,13 @@ class WeiboPipeline(object):
             item.get('school') or '',
             item.get('company') or ''
         )
-        print(user)
-        self.session.add(user)
-        self.session.commit()
-        return item
+        logging.info(user)
+        if session.query(User).filter_by(uid=user.uid).first() is None:
+            session.add(user)
+            try:
+                session.commit()
+            except:
+                session.rollback()
+            return item
+        else:
+            logging.info('已存在User')
