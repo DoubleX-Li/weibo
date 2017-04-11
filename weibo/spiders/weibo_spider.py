@@ -62,9 +62,10 @@ class WeiboSpider(Spider):
             )
         else:
             for uid in self.uncrawled_uids:
-                add_new_uncrawled_uid(uid)
+                add_new_uncrawled_uid(uid[0])
+                logging.info('uid={0}'.format(uid[0]))
                 yield Request(
-                    url='{0}?containerid=100505{1}_-_FOLLOWERS'.format(self.getSecond, uid),
+                    url='{0}?containerid=100505{1}_-_FOLLOWERS'.format(self.getSecond, uid[0]),
                     headers=self.headers,
                     callback=self.parse_followers
                 )
